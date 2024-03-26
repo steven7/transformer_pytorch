@@ -24,6 +24,10 @@ class SelfAttention(nn.Module):
         keys = keys.reshape(N, key_len, self.heads, self.head_dim)
         queries = query.reshape(N, key_len, self.heads, self.head_dim)
 
+        values = self.values(values)
+        keys = self.keys(keys)
+        queries = self.queries(queries)
+
         energy = torch.einsum("nqhd,nkhd->nhqk", [queries, keys])
         # queries shape: (N, query_len, heads, heads_dim)
         # keys shape: (N, key_len, heads, heads_dim)
@@ -94,7 +98,7 @@ class Encoder(nn.Module):
                     dropout=dropout,
                     forward_expansion=forward_expansion,
                 )
-            ]
+            for _ in range(num_layers)]
         )
         self.dropout = nn.Dropout(dropout)
 
@@ -129,7 +133,7 @@ class Decoder(nn.Module):
     def __init__(
             self, 
             trg_vocab_size,
-            embeded_size,
+            embed_size,
             num_layers,
             heads,
             forward_expansion,
@@ -140,14 +144,14 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.device = device
         self.word_embedding = nn.Embedding(trg_vocab_size, dropout, device)
-        self.position_embedding = nn.Embedding(max_length, embeded_size)
+        self.position_embedding = nn.Embedding(max_length, embed_size)
 
         self.layers = nn.ModuleList(
             [DecoderBlock(embed_size, heads, forward_expansion, dropout, device)
              for _ in range(num_layers)]
         )
 
-        self.fc_out = nn.Linear(embeded_size, trg_vocab_size)
+        self.fc_out = nn.Linear(embed_size, trg_vocab_size)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, enc_out, src_mask, trg_mask):
@@ -159,6 +163,7 @@ class Decoder(nn.Module):
             x = layer(x, enc_out, enc_out, src_mask, trg_mask)
 
         out = self.fc_out(x)
+        return out
 
 class Transformer(nn.Module):
     def __init__(
@@ -240,4 +245,3 @@ if __name__ == "__main__":
     )
     out = model(x, trg[:, :-1])
     print(out.shape)
-    
